@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <group android:pivotX="54" android:pivotY="54">
+        <!-- Connecting Lines -->
+        <path
+            android:pathData="M 54,54 L 30,30 M 54,54 L 80,30 M 54,54 L 54,80"
+            android:strokeColor="#00E5FF"
+            android:strokeWidth="6"
+            android:strokeLineCap="round"/>
+            
+        <!-- Center Node -->
+        <path
+            android:pathData="M 54,40 A 14,14 0 1 1 54,68 A 14,14 0 1 1 54,40 Z"
+            android:fillColor="#FFFFFF"/>
+            
+        <!-- Outer Nodes -->
+        <path
+            android:pathData="M 30,22 A 8,8 0 1 1 30,38 A 8,8 0 1 1 30,22 Z"
+            android:fillColor="#00E5FF"/>
+        <path
+            android:pathData="M 80,22 A 8,8 0 1 1 80,38 A 8,8 0 1 1 80,22 Z"
+            android:fillColor="#00E5FF"/>
+        <path
+            android:pathData="M 54,72 A 8,8 0 1 1 54,88 A 8,8 0 1 1 54,72 Z"
+            android:fillColor="#00E5FF"/>
+    </group>
+</vector>

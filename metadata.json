@@ -1,0 +1,6 @@
+{
+  "name": "OmniComm",
+  "description": "Unified resilient communications hub with E2EE mesh, cloud vault, and tactical video rooms.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
