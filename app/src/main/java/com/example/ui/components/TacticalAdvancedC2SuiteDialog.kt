@@ -38,6 +38,15 @@ import com.example.domain.c2.TacticalFormationGroup
 import com.example.domain.c2.VirtualInputType
 import com.example.domain.c2.VirtualRemoteInputTunnel
 import com.example.domain.hardware.TacticalUsbRadioSerialEngine
+import com.example.domain.hardware.TacticalUniversalTvRemoteEngine
+import com.example.domain.hardware.TvRemoteState
+import com.example.domain.hardware.TvBrand
+import com.example.domain.hardware.TvRemoteCommand
+import com.example.domain.hardware.TacticalDeXDisplayEngine
+import com.example.domain.hardware.DeXDisplayState
+import com.example.domain.hardware.DeXOperatingMode
+import com.example.domain.c2.TacticalUniversalDeviceGateway
+import com.example.domain.c2.UniversalGatewayState
 import com.example.domain.media.AfskBell202ModemEngine
 import com.example.domain.media.AfskModemState
 import com.example.domain.repository.TacticalC2AuditRepository
@@ -86,6 +95,15 @@ fun TacticalAdvancedC2SuiteDialog(
 
     val auditRepo = remember { TacticalC2AuditRepository.getInstance(context) }
     val c2Logs by auditRepo.recentC2Logs.collectAsStateWithLifecycle(initialValue = emptyList())
+
+    val tvRemoteEngine = remember { TacticalUniversalTvRemoteEngine.getInstance(context) }
+    val tvRemoteState by tvRemoteEngine.state.collectAsStateWithLifecycle()
+
+    val dexDisplayEngine = remember { TacticalDeXDisplayEngine.getInstance(context) }
+    val dexState by dexDisplayEngine.state.collectAsStateWithLifecycle()
+
+    val deviceGateway = remember { TacticalUniversalDeviceGateway.getInstance(context) }
+    val gatewayState by deviceGateway.state.collectAsStateWithLifecycle()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -160,7 +178,10 @@ fun TacticalAdvancedC2SuiteDialog(
                         Triple(3, "Formación OTAN", Icons.Default.Groups),
                         Triple(4, "C2 Anti-Replay", Icons.Default.Security),
                         Triple(5, "IA Visión", Icons.Default.CameraAlt),
-                        Triple(6, "Auditoría DB", Icons.Default.Storage)
+                        Triple(6, "Auditoría DB", Icons.Default.Storage),
+                        Triple(7, "Control TV (IR)", Icons.Default.Tv),
+                        Triple(8, "Omni-DeX (HDMI)", Icons.Default.DesktopWindows),
+                        Triple(9, "Puente Multi-OS", Icons.Default.Devices)
                     )
 
                     tabs.forEach { (idx, title, icon) ->
@@ -207,6 +228,9 @@ fun TacticalAdvancedC2SuiteDialog(
                         4 -> TacticalC2SecurityTab(c2SecurityVerifier, c2SecState)
                         5 -> TacticalVisionClassifierTab(visionClassifier, visionState)
                         6 -> TacticalC2AuditRoomTab(auditRepo, c2Logs)
+                        7 -> TacticalTvRemoteTab(tvRemoteEngine, tvRemoteState)
+                        8 -> TacticalDeXDisplayTab(dexDisplayEngine, dexState)
+                        9 -> TacticalDeviceGatewayTab(deviceGateway, gatewayState)
                     }
                 }
             }
@@ -1378,6 +1402,601 @@ private fun TacticalC2SecurityTab(
                     Text("Sin alertas registradas.", fontSize = 8.sp, color = Color.DarkGray)
                 } else {
                     state.securityLogs.takeLast(6).reversed().forEach { log ->
+                        Text(log, fontSize = 7.5.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// TAB: CONTROL REMOTO UNIVERSAL DE PANTALLA (IR BLASTER & SMART TV LAN)
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun TacticalTvRemoteTab(
+    tvEngine: TacticalUniversalTvRemoteEngine,
+    state: TvRemoteState
+) {
+    var ipInput by remember { mutableStateOf(state.smartTvIpAddress) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Estado del hardware IR y Red
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("CONTROL REMOTO UNIVERSAL DE TV", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                        Text(state.transmissionMode, fontSize = 8.sp, color = Color(0xFF38BDF8))
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (state.hasIrBlaster) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFF59E0B).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (state.hasIrBlaster) Color(0xFF10B981) else Color(0xFFF59E0B))
+                    ) {
+                        Text(
+                            if (state.hasIrBlaster) "EMISOR IR FÍSICO ACTIVO" else "EMULACIÓN SMART TV LAN",
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.hasIrBlaster) Color(0xFF34D399) else Color(0xFFFBBF24),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    C2StatBadge(title = "Marca Seleccionada", value = state.selectedBrand.label.take(12), color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Frecuencia IR", value = "${state.selectedBrand.irCarrierHz / 1000} kHz", color = Color(0xFF34D399), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Último Comando", value = state.lastCommandSent.take(10), color = Color(0xFFFBBF24), modifier = Modifier.weight(1f))
+                }
+            }
+        }
+
+        // Selector de Marcas de Pantallas / Televisores
+        Text("Perfil de Televisor (Smart TV o Pantalla Convencional):", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            TvBrand.values().forEach { brand ->
+                val isSelected = state.selectedBrand == brand
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (isSelected) Color(0xFF0284C7) else Color(0xFF1E293B),
+                    modifier = Modifier.clickable { tvEngine.setBrand(brand) }
+                ) {
+                    Text(
+                        brand.label,
+                        fontSize = 8.5.sp,
+                        color = Color.White,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+
+        // Botonera de Control Remoto Táctico
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xFF0B0F19),
+            border = BorderStroke(1.5.dp, Color(0xFF1E293B)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Fila Superior: Encendido, Mute y Fuente HDMI
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Button(
+                        onClick = { tvEngine.sendCommand(TvRemoteCommand.POWER) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        modifier = Modifier.weight(1f).height(42.dp)
+                    ) {
+                        Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("POWER", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { tvEngine.sendCommand(TvRemoteCommand.MUTE) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                        modifier = Modifier.weight(0.8f).height(42.dp)
+                    ) {
+                        Icon(Icons.Default.VolumeMute, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("MUTE", fontSize = 9.sp)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { tvEngine.sendCommand(TvRemoteCommand.INPUT_SOURCE) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                        modifier = Modifier.weight(1.1f).height(42.dp)
+                    ) {
+                        Icon(Icons.Default.Input, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("FUENTE HDMI", fontSize = 8.5.sp)
+                    }
+                }
+
+                // D-Pad Central de Navegación
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Botón Arriba
+                    FilledTonalButton(
+                        onClick = { tvEngine.sendCommand(TvRemoteCommand.DPAD_UP) },
+                        modifier = Modifier.size(width = 80.dp, height = 36.dp)
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                    }
+
+                    // Fila Izquierda - OK - Derecha
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilledTonalButton(
+                            onClick = { tvEngine.sendCommand(TvRemoteCommand.DPAD_LEFT) },
+                            modifier = Modifier.size(width = 54.dp, height = 44.dp)
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null)
+                        }
+
+                        Button(
+                            onClick = { tvEngine.sendCommand(TvRemoteCommand.DPAD_OK) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8)),
+                            modifier = Modifier.size(width = 70.dp, height = 50.dp)
+                        ) {
+                            Text("OK", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF0D1117))
+                        }
+
+                        FilledTonalButton(
+                            onClick = { tvEngine.sendCommand(TvRemoteCommand.DPAD_RIGHT) },
+                            modifier = Modifier.size(width = 54.dp, height = 44.dp)
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
+                        }
+                    }
+
+                    // Botón Abajo
+                    FilledTonalButton(
+                        onClick = { tvEngine.sendCommand(TvRemoteCommand.DPAD_DOWN) },
+                        modifier = Modifier.size(width = 80.dp, height = 36.dp)
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                    }
+                }
+
+                // Control de Volumen y Canales
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    // Control de Volumen
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF161B22),
+                        border = BorderStroke(1.dp, Color(0xFF30363D)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("VOLUMEN", fontSize = 8.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = { tvEngine.sendCommand(TvRemoteCommand.VOLUME_UP) },
+                                modifier = Modifier.fillMaxWidth().height(32.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F2937))
+                            ) { Text("+", fontSize = 12.sp) }
+                            Button(
+                                onClick = { tvEngine.sendCommand(TvRemoteCommand.VOLUME_DOWN) },
+                                modifier = Modifier.fillMaxWidth().height(32.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F2937))
+                            ) { Text("-", fontSize = 12.sp) }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Navegación Smart: Home / Return
+                    Column(
+                        modifier = Modifier.weight(0.8f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        OutlinedButton(
+                            onClick = { tvEngine.sendCommand(TvRemoteCommand.HOME) },
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            border = BorderStroke(1.dp, Color(0xFF38BDF8))
+                        ) {
+                            Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF38BDF8))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("HOME", fontSize = 8.sp, color = Color.White)
+                        }
+
+                        OutlinedButton(
+                            onClick = { tvEngine.sendCommand(TvRemoteCommand.BACK) },
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            border = BorderStroke(1.dp, Color(0xFF94A3B8))
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.LightGray)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("ATRÁS", fontSize = 8.sp, color = Color.LightGray)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Control de Canales
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF161B22),
+                        border = BorderStroke(1.dp, Color(0xFF30363D)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("CANALES", fontSize = 8.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = { tvEngine.sendCommand(TvRemoteCommand.CHANNEL_UP) },
+                                modifier = Modifier.fillMaxWidth().height(32.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F2937))
+                            ) { Text("▲", fontSize = 10.sp) }
+                            Button(
+                                onClick = { tvEngine.sendCommand(TvRemoteCommand.CHANNEL_DOWN) },
+                                modifier = Modifier.fillMaxWidth().height(32.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F2937))
+                            ) { Text("▼", fontSize = 10.sp) }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Historial de Pulsos y Comandos Emitidos
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF030712),
+            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Registro de Emisiones IR & LAN:", fontSize = 8.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                if (state.recentActionLog.isEmpty()) {
+                    Text("Sin pulsos emitidos aún.", fontSize = 7.5.sp, color = Color.Gray)
+                } else {
+                    state.recentActionLog.takeLast(6).reversed().forEach { log ->
+                        Text(log, fontSize = 7.5.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// TAB: ESCRITORIO TÁCTICO OMNI-DEX (HDMI OTG / CAST MILITAR)
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun TacticalDeXDisplayTab(
+    dexEngine: TacticalDeXDisplayEngine,
+    state: DeXDisplayState
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Estado de Pantalla Secundaria Externa
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("SISTEMA OMNI-DEX MILITAR C4ISR", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                        Text("Salida HDMI OTG / DisplayPort / Wireless Miracast", fontSize = 8.sp, color = Color(0xFF38BDF8))
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (state.isExternalDisplayConnected) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFF0284C7).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (state.isExternalDisplayConnected) Color(0xFF10B981) else Color(0xFF0284C7))
+                    ) {
+                        Text(
+                            if (state.isExternalDisplayConnected) "PANTALLA EXTERNA CONECTADA" else "MODO ESTACIÓN ARMADO",
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.isExternalDisplayConnected) Color(0xFF34D399) else Color(0xFF38BDF8),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    C2StatBadge(title = "Resolución Externa", value = state.externalResolution.take(15), color = Color(0xFF38BDF8), modifier = Modifier.weight(1.3f))
+                    C2StatBadge(title = "Tiempo ZULU", value = state.zuluTime, color = Color(0xFF34D399), modifier = Modifier.weight(0.9f))
+                    C2StatBadge(title = "DEFCON Status", value = "DEFCON ${state.defconStatus}", color = Color(0xFFEF4444), modifier = Modifier.weight(0.9f))
+                }
+
+                // Selector de Modo: Omni-DeX Desktop vs Screen Mirroring
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DeXOperatingMode.values().take(2).forEach { mode ->
+                        val isSel = state.operatingMode == mode
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSel) Color(0xFF0284C7) else Color(0xFF1E293B),
+                            border = BorderStroke(1.dp, if (isSel) Color(0xFF38BDF8) else Color.Transparent),
+                            modifier = Modifier.weight(1f).clickable { dexEngine.setOperatingMode(mode) }
+                        ) {
+                            Column(modifier = Modifier.padding(6.dp)) {
+                                Text(mode.label, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(mode.description, fontSize = 7.sp, color = Color.LightGray, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Miniatura Visual del Escritorio Militar Proyectado
+        Text("Previsualización del Escritorio Militar en Pantalla Grande:", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = Color(0xFF020617),
+            border = BorderStroke(1.5.dp, Color(0xFF38BDF8).copy(alpha = 0.8f)),
+            modifier = Modifier.fillMaxWidth().height(160.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Barra Superior Militar DeX
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(20.dp).background(Color(0xFF0F172A)).padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("OMNI-DEX OS • C4ISR TACTICAL DESKTOP", fontSize = 6.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                    Text("UTC ${state.zuluTime} | ${state.emconStatus} | GPS 3D FIX", fontSize = 6.sp, color = Color(0xFF34D399))
+                }
+
+                // Ventanas Tácticas del Escritorio
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(top = 24.dp, bottom = 24.dp, start = 8.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    state.windows.forEach { win ->
+                        if (win.isVisible) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFF1E293B).copy(alpha = 0.85f),
+                                border = BorderStroke(1.dp, Color(0xFF475569)),
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            ) {
+                                Column(modifier = Modifier.padding(4.dp)) {
+                                    Text(win.title, fontSize = 6.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Box(
+                                        modifier = Modifier.fillMaxSize().background(Color(0xFF0B0F19)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(win.iconName, fontSize = 8.sp, color = Color(0xFF38BDF8))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Cursor del Ratón Táctico
+                Box(
+                    modifier = Modifier
+                        .offset(
+                            x = (state.pointerXPercent * 280).dp,
+                            y = (state.pointerYPercent * 130).dp
+                        )
+                        .size(10.dp)
+                        .background(if (state.isPointerClicking) Color(0xFFEF4444) else Color(0xFF38BDF8), CircleShape)
+                        .border(1.dp, Color.White, CircleShape)
+                )
+
+                // Barra de Tareas Inferior Militar DeX
+                Row(
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(20.dp).background(Color(0xFF0F172A)).padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("INICIO C2 | PROCESOS (4)", fontSize = 6.sp, color = Color.LightGray)
+                    Text("AUDIO PTT: STANDBY | ${state.externalResolution}", fontSize = 6.sp, color = Color.Gray)
+                }
+            }
+        }
+
+        // Trackpad Táctico del Móvil para Controlar el Cursor en la TV
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Panel Táctil del Móvil (Trackpad para Pantalla TV):", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .background(Color(0xFF0B0F19), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                dexEngine.moveTrackpadPointer(dragAmount.x * 0.003f, dragAmount.y * 0.003f)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.TouchApp, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Desliza el dedo aquí para mover el cursor en la TV", fontSize = 8.sp, color = Color.Gray)
+                    }
+                }
+
+                Button(
+                    onClick = { dexEngine.triggerPointerClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                ) {
+                    Icon(Icons.Default.AdsClick, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Hacer Click en Pantalla Externa", fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// TAB: PASARELA UNIVERSAL MULTI-DISPOSITIVO (PC, MAC, LINUX, IPHONE, ANDROID)
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun TacticalDeviceGatewayTab(
+    gateway: TacticalUniversalDeviceGateway,
+    state: UniversalGatewayState
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Estado del Servidor Gateway
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("PASARELA C4ISR MULTI-DISPOSITIVO", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                        Text("Enlace Web Militar HTTP/Socket Local (Puerto ${state.port})", fontSize = 8.sp, color = Color(0xFF38BDF8))
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (state.isRunning) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (state.isRunning) Color(0xFF10B981) else Color(0xFFEF4444))
+                    ) {
+                        Text(
+                            if (state.isRunning) "SERVIDOR ACTIVO" else "DETENIDO",
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.isRunning) Color(0xFF34D399) else Color(0xFFF87171),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    C2StatBadge(title = "IP Local", value = state.localIpAddress, color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Peticiones Atendidas", value = "${state.totalRequestsHandled}", color = Color(0xFF34D399), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Clientes Activos", value = "${state.connectedClientsCount}", color = Color(0xFFFBBF24), modifier = Modifier.weight(1f))
+                }
+            }
+        }
+
+        // Tarjeta de Conexión Rápida
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = Color(0xFF030712),
+            border = BorderStroke(1.dp, Color(0xFF0284C7)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("URL de Acceso para Laptops, iPhones y Otros Dispositivos:", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFF0B0F19),
+                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        state.accessUrl,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF38BDF8),
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                    )
+                }
+                Text(
+                    "Abre esta dirección desde el navegador Safari en cualquier iPhone/iPad, o Chrome/Firefox en cualquier laptop Windows, Mac o Linux conectada a la misma red Wi-Fi o Hotspot para controlar la TV, el cursor DeX y las funciones C2.",
+                    fontSize = 7.5.sp,
+                    color = Color.LightGray
+                )
+            }
+        }
+
+        // Interruptor del Servidor
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(
+                onClick = {
+                    if (state.isRunning) gateway.stopGateway() else gateway.startGateway()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (state.isRunning) Color(0xFFEF4444) else Color(0xFF10B981)
+                ),
+                modifier = Modifier.fillMaxWidth().height(38.dp)
+            ) {
+                Icon(if (state.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(if (state.isRunning) "Detener Servidor Pasarela" else "Iniciar Servidor Pasarela Local", fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Registro de Actividad Web
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF030712),
+            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Bitácora de Clientes Web Conectados:", fontSize = 8.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                if (state.clientLogs.isEmpty()) {
+                    Text("Esperando conexiones remotas...", fontSize = 7.5.sp, color = Color.Gray)
+                } else {
+                    state.clientLogs.takeLast(6).reversed().forEach { log ->
                         Text(log, fontSize = 7.5.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
                     }
                 }

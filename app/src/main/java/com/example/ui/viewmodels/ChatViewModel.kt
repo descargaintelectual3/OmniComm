@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -141,6 +142,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 chatDao.getMessagesForSession(sessionId)
             }
         }
+    }.map { list ->
+        list.map { com.example.domain.security.E2EERoomPayloadSecurityUtility.unsealMessageAfterQuery(it) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val pendingMessagesCount: StateFlow<Int> = chatDao.getPendingCountFlow()

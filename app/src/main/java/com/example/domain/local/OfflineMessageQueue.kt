@@ -67,18 +67,21 @@ class OfflineMessageQueue(
     }
 
     /**
-     * Encola un nuevo mensaje. Lo guarda en Room como PENDING y dispara la verificación de envío.
+     * Encola un nuevo mensaje. Lo guarda en Room como PENDING (cifrado con AES-256-GCM + SQLCipher)
+     * y dispara la verificación de envío.
      */
     suspend fun enqueueMessage(message: ChatMessageEntity) {
-        val pendingMsg = message.copy(status = "PENDING")
-        chatDao.insertMessage(pendingMsg)
-        Log.d("MessageQueue", "Mensaje encolado en BD Local con status PENDING: ${pendingMsg.id}")
+        val securedMsg = com.example.domain.security.E2EERoomPayloadSecurityUtility.secureMessageBeforeInsert(
+            message.copy(status = "PENDING")
+        )
+        chatDao.insertMessage(securedMsg)
+        Log.d("MessageQueue", "Mensaje encolado en BD Local con status PENDING (E2EE asegurado): ${securedMsg.id}")
 
-        // Intento directo inmediato si hay conexión
+        // Intento directo inmediato si hay conexión (con texto original plano para retransmisión)
         if (meshService.isConnectedToAnyNode()) {
-            val payload = "${pendingMsg.senderName}:${pendingMsg.text}"
+            val payload = "${message.senderName}:${message.text}"
             if (meshService.sendMessageOffline(payload)) {
-                chatDao.updateMessage(pendingMsg.copy(status = "SENT"))
+                chatDao.updateMessage(securedMsg.copy(status = "SENT"))
             }
         } else {
             // Disparar sincronización de WorkManager respetando la batería

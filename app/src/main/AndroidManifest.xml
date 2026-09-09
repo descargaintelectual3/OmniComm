@@ -28,6 +28,8 @@
 
     <uses-feature android:name="android.hardware.camera.any" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-permission android:name="android.permission.TRANSMIT_IR" />
+    <uses-feature android:name="android.hardware.consumerir" android:required="false" />
 
     <application
         android:name=".OmniApplication"

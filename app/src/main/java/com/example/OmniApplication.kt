@@ -51,9 +51,12 @@ class OmniApplication : Application() {
         try {
             com.example.domain.hardware.TacticalUsbRadioSerialEngine.getInstance(this)
             com.example.domain.media.AfskBell202ModemEngine.initialize(this)
-            Log.d("OmniApplication", "Motores de Radio USB y Módem Analógico AFSK Bell 202 inicializados.")
+            com.example.domain.hardware.TacticalUniversalTvRemoteEngine.getInstance(this)
+            com.example.domain.hardware.TacticalDeXDisplayEngine.getInstance(this)
+            com.example.domain.c2.TacticalUniversalDeviceGateway.getInstance(this)
+            Log.d("OmniApplication", "Motores C4ISR: Radio USB, Módem AFSK, Remoto TV, Omni-DeX HDMI y Pasarela Multi-Dispositivo inicializados.")
         } catch (t: Throwable) {
-            Log.w("OmniApplication", "Error al inicializar motores de radio: ${t.message}")
+            Log.w("OmniApplication", "Error al inicializar suite táctica extendida: ${t.message}")
         }
     }
 }
