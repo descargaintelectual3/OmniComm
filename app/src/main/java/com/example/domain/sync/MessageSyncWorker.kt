@@ -27,13 +27,12 @@ class MessageSyncWorker(
 
     override suspend fun doWork(): Result {
         Log.d(TAG, "⚡ Ejecutando MessageSyncWorker con restricción de batería optimizada.")
-        val database = OmniDatabase.getDatabase(applicationContext)
-        val chatDao = database.chatDao()
-
         return try {
+            val database = OmniDatabase.getDatabase(applicationContext)
+            val chatDao = database.chatDao()
             val pendingMessages = chatDao.getPendingMessages()
             if (pendingMessages.isEmpty()) {
-                Log.d(TAG, "No hay mensajes pendientes de transmisión en la bóveda SQLCipher.")
+                Log.d(TAG, "No hay mensajes pendientes de transmisión en la bóveda Room.")
                 return Result.success()
             }
 
@@ -50,8 +49,8 @@ class MessageSyncWorker(
             }
 
             Result.success()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error durante la sincronización de mensajes en segundo plano", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error durante la sincronización de mensajes en segundo plano: ${t.message}", t)
             if (runAttemptCount < 3) {
                 Result.retry()
             } else {

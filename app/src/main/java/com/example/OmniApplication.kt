@@ -25,7 +25,17 @@ class OmniApplication : Application() {
             }
         }
 
-        // 2. Inicialización segura de Firebase (con fallback offline inmediato)
+        // 2. Inicialización de librerías nativas y base de datos segura
+        try {
+            com.example.domain.local.OmniDatabase.loadSqlCipherNative()
+            // Inicializar la instancia de base de datos de manera anticipada para calentar el pool
+            com.example.domain.local.OmniDatabase.getDatabase(this)
+            Log.d("OmniApplication", "OmniDatabase y soporte nativo inicializados.")
+        } catch (t: Throwable) {
+            Log.w("OmniApplication", "Aviso al pre-inicializar base de datos: ${t.message}")
+        }
+
+        // 3. Inicialización segura de Firebase (con fallback offline inmediato)
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
                 val options = FirebaseOptions.Builder()
