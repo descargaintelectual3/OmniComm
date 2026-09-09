@@ -40,12 +40,20 @@ class OmniApplication : Application() {
             Log.w("OmniApplication", "No se pudo inicializar FirebaseApp: ${t.message}")
         }
 
-        // 3. Inicialización DTN Store & Forward
+        // 3. Inicialización DTN Store & Forward y Radios Tácticas
         try {
             com.example.domain.p2p.StoreAndForwardRouter.getInstance().initialize(this)
             Log.d("OmniApplication", "StoreAndForwardRouter DTN inicializado exitosamente.")
         } catch (t: Throwable) {
             Log.w("OmniApplication", "Error al inicializar DTN Router: ${t.message}")
+        }
+
+        try {
+            com.example.domain.hardware.TacticalUsbRadioSerialEngine.getInstance(this)
+            com.example.domain.media.AfskBell202ModemEngine.initialize(this)
+            Log.d("OmniApplication", "Motores de Radio USB y Módem Analógico AFSK Bell 202 inicializados.")
+        } catch (t: Throwable) {
+            Log.w("OmniApplication", "Error al inicializar motores de radio: ${t.message}")
         }
     }
 }

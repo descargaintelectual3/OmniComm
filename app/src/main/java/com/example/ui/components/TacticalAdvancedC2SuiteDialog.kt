@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,10 +33,16 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.domain.ai.TacticalComputerVisionClassifier
 import com.example.domain.ai.TargetThreatLevel
+import com.example.domain.c2.TacticalFormationClusteringEngine
+import com.example.domain.c2.TacticalFormationGroup
 import com.example.domain.c2.VirtualInputType
 import com.example.domain.c2.VirtualRemoteInputTunnel
 import com.example.domain.hardware.TacticalUsbRadioSerialEngine
+import com.example.domain.media.AfskBell202ModemEngine
+import com.example.domain.media.AfskModemState
 import com.example.domain.repository.TacticalC2AuditRepository
+import com.example.domain.security.C2SecurityState
+import com.example.domain.security.TacticalC2SignatureVerifier
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -65,6 +72,15 @@ fun TacticalAdvancedC2SuiteDialog(
     val usbRadioEngine = remember { TacticalUsbRadioSerialEngine.getInstance(context) }
     val usbState by usbRadioEngine.state.collectAsStateWithLifecycle()
 
+    val afskModemEngine = remember { AfskBell202ModemEngine.getInstance() }
+    val afskState by afskModemEngine.state.collectAsStateWithLifecycle()
+
+    val formationEngine = remember { TacticalFormationClusteringEngine.getInstance() }
+    val formations by formationEngine.formations.collectAsStateWithLifecycle()
+
+    val c2SecurityVerifier = remember { TacticalC2SignatureVerifier }
+    val c2SecState by c2SecurityVerifier.state.collectAsStateWithLifecycle()
+
     val visionClassifier = remember { TacticalComputerVisionClassifier.getInstance(context) }
     val visionState by visionClassifier.state.collectAsStateWithLifecycle()
 
@@ -78,7 +94,7 @@ fun TacticalAdvancedC2SuiteDialog(
             border = BorderStroke(1.5.dp, Color(0xFF38BDF8).copy(alpha = 0.6f)),
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.92f)
+                .fillMaxHeight(0.94f)
                 .shadow(24.dp, RoundedCornerShape(20.dp))
                 .testTag("tactical_advanced_c2_suite_dialog")
         ) {
@@ -112,8 +128,8 @@ fun TacticalAdvancedC2SuiteDialog(
                                 fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                "INPUT REMOTO | USB RADIO | IA VISIÓN | ROOM AUDIT",
-                                fontSize = 8.sp,
+                                "INPUT | USB TNC | AFSK 202 | OTAN APP-6D | ED25519 ANTI-REPLAY | IA | DB",
+                                fontSize = 7.5.sp,
                                 color = Color(0xFF94A3B8),
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -130,16 +146,21 @@ fun TacticalAdvancedC2SuiteDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Selector de pestañas horizontales
+                // Selector de pestañas horizontales desplazable
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val tabs = listOf(
                         Triple(0, "Input Virtual", Icons.Default.Mouse),
                         Triple(1, "Radio USB", Icons.Default.Radio),
-                        Triple(2, "IA Visión", Icons.Default.CameraAlt),
-                        Triple(3, "Auditoría DB", Icons.Default.Storage)
+                        Triple(2, "Módem AFSK", Icons.Default.GraphicEq),
+                        Triple(3, "Formación OTAN", Icons.Default.Groups),
+                        Triple(4, "C2 Anti-Replay", Icons.Default.Security),
+                        Triple(5, "IA Visión", Icons.Default.CameraAlt),
+                        Triple(6, "Auditoría DB", Icons.Default.Storage)
                     )
 
                     tabs.forEach { (idx, title, icon) ->
@@ -149,11 +170,10 @@ fun TacticalAdvancedC2SuiteDialog(
                             color = if (isSelected) Color(0xFF38BDF8).copy(alpha = 0.25f) else Color(0xFF161B22),
                             border = BorderStroke(1.dp, if (isSelected) Color(0xFF38BDF8) else Color(0xFF30363D)),
                             modifier = Modifier
-                                .weight(1f)
                                 .clickable { activeTab = idx }
                         ) {
                             Row(
-                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                modifier = Modifier.padding(vertical = 7.dp, horizontal = 10.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -161,9 +181,9 @@ fun TacticalAdvancedC2SuiteDialog(
                                     icon,
                                     contentDescription = null,
                                     tint = if (isSelected) Color(0xFF38BDF8) else Color.Gray,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(13.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     title,
                                     fontSize = 9.sp,
@@ -182,8 +202,11 @@ fun TacticalAdvancedC2SuiteDialog(
                     when (activeTab) {
                         0 -> VirtualRemoteInputTab(inputTunnel, inputState)
                         1 -> TacticalUsbRadioTab(usbRadioEngine, usbState)
-                        2 -> TacticalVisionClassifierTab(visionClassifier, visionState)
-                        3 -> TacticalC2AuditRoomTab(auditRepo, c2Logs)
+                        2 -> TacticalAfskModemTab(afskModemEngine, afskState)
+                        3 -> TacticalFormationTab(formationEngine, formations)
+                        4 -> TacticalC2SecurityTab(c2SecurityVerifier, c2SecState)
+                        5 -> TacticalVisionClassifierTab(visionClassifier, visionState)
+                        6 -> TacticalC2AuditRoomTab(auditRepo, c2Logs)
                     }
                 }
             }
@@ -871,3 +894,495 @@ private fun TacticalC2AuditRoomTab(
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// COMPONENTE DE ESTADÍSTICA TÁCTICA
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun C2StatBadge(
+    title: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF0D1117),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.4f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(title, fontSize = 7.sp, color = Color.Gray, maxLines = 1)
+            Text(value, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// TAB: MÓDEM DE AUDIO ANALÓGICO AFSK BELL 202 / AX.25 (1200 BAUDIOS)
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun TacticalAfskModemTab(
+    modemEngine: AfskBell202ModemEngine,
+    state: AfskModemState
+) {
+    var callsign by remember { mutableStateOf("ECHO-7") }
+    var payloadText by remember { mutableStateOf("SITREP: POSICIÓN ASEGURADA, LISTO PARA ENLACE") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Tarjeta de Estado AFSK
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
+                        Text("Módem Analógico AFSK Bell 202", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (state.isTransmitting) Color(0xFFEF4444).copy(alpha = 0.2f) else Color(0xFF10B981).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (state.isTransmitting) Color(0xFFEF4444) else Color(0xFF10B981))
+                    ) {
+                        Text(
+                            if (state.isTransmitting) "TX EN VIVO (AUDIO)" else "STANDBY / RX",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.isTransmitting) Color(0xFFEF4444) else Color(0xFF10B981),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    C2StatBadge(title = "Baudios", value = "${state.baudRate} bps", color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Mark (Bit 1)", value = "${state.markFreqHz.toInt()} Hz", color = Color(0xFF34D399), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Space (Bit 0)", value = "${state.spaceFreqHz.toInt()} Hz", color = Color(0xFFFBBF24), modifier = Modifier.weight(1f))
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    C2StatBadge(title = "TX Enviados", value = "${state.packetsSentCount}", color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "RX Recibidos", value = "${state.packetsReceivedCount}", color = Color(0xFF10B981), modifier = Modifier.weight(1f))
+                    C2StatBadge(title = "Errores CRC", value = "${state.crcErrorsCount}", color = Color(0xFFF87171), modifier = Modifier.weight(1f))
+                }
+
+                // Barra de VU Meter de Audio
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Nivel de Salida de Audio / Modulación", fontSize = 8.sp, color = Color.Gray)
+                        Text("${(state.audioLevelRms * 100).toInt()}%", fontSize = 8.sp, color = Color(0xFF00E5FF), fontFamily = FontFamily.Monospace)
+                    }
+                    LinearProgressIndicator(
+                        progress = { state.audioLevelRms },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        color = Color(0xFF00E5FF),
+                        trackColor = Color(0xFF21262D)
+                    )
+                }
+            }
+        }
+
+        // Panel de Transmisión Táctica
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Transmisión sobre Radio Analógica (Jack 3.5mm / Bluetooth)", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color(0xFF38BDF8))
+
+                OutlinedTextField(
+                    value = callsign,
+                    onValueChange = { callsign = it.uppercase() },
+                    label = { Text("Indicativo / Callsign", fontSize = 9.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.LightGray,
+                        focusedBorderColor = Color(0xFF38BDF8),
+                        unfocusedBorderColor = Color(0xFF30363D)
+                    )
+                )
+
+                OutlinedTextField(
+                    value = payloadText,
+                    onValueChange = { payloadText = it },
+                    label = { Text("Mensaje / Trama AX.25", fontSize = 9.sp) },
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.LightGray,
+                        focusedBorderColor = Color(0xFF38BDF8),
+                        unfocusedBorderColor = Color(0xFF30363D)
+                    )
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = { modemEngine.transmitTacticalFrame(callsign, payloadText) },
+                        enabled = !state.isTransmitting && payloadText.isNotBlank(),
+                        modifier = Modifier.weight(1.5f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
+                    ) {
+                        Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Emitir Audio AFSK", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { modemEngine.simulateIncomingAfskFrame("TANGO-9", "COORD 19.4326,-99.1332 SOS") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
+                        border = BorderStroke(1.dp, Color(0xFF10B981))
+                    ) {
+                        Icon(Icons.Default.SyncAlt, contentDescription = null, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Simular RX", fontSize = 8.sp)
+                    }
+                }
+            }
+        }
+
+        // Registro de actividad AFSK
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Registro de Modulación de Audio", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color.Gray)
+                if (state.recentLogs.isEmpty()) {
+                    Text("Sin actividad registrada aún.", fontSize = 8.sp, color = Color.DarkGray)
+                } else {
+                    state.recentLogs.takeLast(6).reversed().forEach { logLine ->
+                        Text(logLine, fontSize = 7.5.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// TAB: FORMACIONES TÁCTICAS MILITARES OTAN APP-6D
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun TacticalFormationTab(
+    engine: TacticalFormationClusteringEngine,
+    formations: List<TacticalFormationGroup>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Cabecera de Formaciones
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.Groups, contentDescription = null, tint = Color(0xFFA855F7), modifier = Modifier.size(18.dp))
+                        Text("Clustering Táctico OTAN APP-6D", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = { engine.loadBaselineTacticalClusters() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Recalcular", fontSize = 8.sp)
+                    }
+                }
+
+                Text(
+                    "Agrupación automática por geometría espacial, vector de avance y arcos de tiro entre nodos de la malla.",
+                    fontSize = 8.sp,
+                    color = Color.LightGray
+                )
+            }
+        }
+
+        // Listado de formaciones
+        if (formations.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF161B22),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Text("No hay formaciones activas detectadas en el teatro.", fontSize = 9.sp, color = Color.Gray, modifier = Modifier.padding(16.dp))
+            }
+        } else {
+            formations.forEach { group ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF161B22),
+                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFA855F7).copy(alpha = 0.25f),
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(group.echelon.symbol, color = Color(0xFFA855F7), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                }
+                                Column {
+                                    Text(group.formationType.label, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                                    Text("${group.echelon.label} • ${group.formationType.natoCode}", fontSize = 7.5.sp, color = Color(0xFFA855F7))
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                border = BorderStroke(0.8.dp, Color(0xFF10B981))
+                            ) {
+                                Text(
+                                    "Confianza: ${(group.detectionConfidence * 100).toInt()}%",
+                                    fontSize = 7.5.sp,
+                                    color = Color(0xFF10B981),
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Text(group.formationType.description, fontSize = 8.sp, color = Color.LightGray)
+
+                        // Métricas del grupo
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            C2StatBadge("Radio Dispersión", "${"%.0f".format(group.radiusMeters)} m", Color(0xFF38BDF8), Modifier.weight(1f))
+                            C2StatBadge("Rumbo Medio", "${"%.0f".format(group.averageHeadingDegrees)}°", Color(0xFFFBBF24), Modifier.weight(1f))
+                            C2StatBadge("Velocidad", "${"%.1f".format(group.averageSpeedKmh)} km/h", Color(0xFF34D399), Modifier.weight(1f))
+                        }
+
+                        // Coordenadas del Centroide y Arco de Fuego
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFF0D1117),
+                            border = BorderStroke(0.8.dp, Color(0xFF21262D))
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    "Centroide Táctico: ${"%.5f".format(group.centroidLatitude)}, ${"%.5f".format(group.centroidLongitude)}",
+                                    fontSize = 7.5.sp,
+                                    color = Color(0xFF94A3B8),
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    "Arco de Cobertura de Fuego: ${"%.0f".format(group.fireArcStartDegrees)}° a ${"%.0f".format(group.fireArcEndDegrees)}°",
+                                    fontSize = 7.5.sp,
+                                    color = Color(0xFFF43F5E)
+                                )
+                                Text(
+                                    "Elementos integrados: ${group.members.joinToString(", ") { it.callsign }}",
+                                    fontSize = 7.5.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// TAB: CRIPTOGRAFÍA C2 ED25519 / P-256 CON VALIDACIÓN ANTI-REPLAY
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun TacticalC2SecurityTab(
+    verifier: TacticalC2SignatureVerifier,
+    state: C2SecurityState
+) {
+    var lastVerificationResult by remember { mutableStateOf<com.example.domain.security.C2VerificationResult?>(null) }
+    var cachedSignedPayload by remember { mutableStateOf<com.example.domain.security.SignedC2Payload?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Cabecera de Hardware Criptográfico
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                        Text("Criptoseguridad C2 Anti-Replay", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (state.isHardwareKeyStoreActive) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFF59E0B).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (state.isHardwareKeyStoreActive) Color(0xFF10B981) else Color(0xFFF59E0B))
+                    ) {
+                        Text(
+                            if (state.isHardwareKeyStoreActive) "HARDWARE KEYSTORE" else "SOFTWARE FALLBACK",
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.isHardwareKeyStoreActive) Color(0xFF10B981) else Color(0xFFF59E0B),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    "Huella Digital Clave Local (ECDSA P-256): ${state.localKeyFingerprint}",
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFF38BDF8)
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    C2StatBadge("Firmadas", "${state.totalSignedCommands}", Color(0xFF38BDF8), Modifier.weight(1f))
+                    C2StatBadge("Auténticas", "${state.totalVerifiedValid}", Color(0xFF10B981), Modifier.weight(1f))
+                    C2StatBadge("Replay Bloqueados", "${state.totalReplayAttacksBlocked}", Color(0xFFEF4444), Modifier.weight(1f))
+                }
+            }
+        }
+
+        // Laboratorio Interactivo de Prueba de Ataques y Firmas
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Laboratorio de Validación Criptográfica en Malla", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color(0xFF38BDF8))
+                Text(
+                    "Firma órdenes con timestamp atómico y nonce único. Si un adversario intercepta la radiofrecuencia y reinyecta el paquete, el sistema lo bloquea automáticamente.",
+                    fontSize = 7.5.sp,
+                    color = Color.LightGray
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = {
+                            val signed = verifier.signC2Command(
+                                commandId = "CMD-${System.currentTimeMillis().toString().takeLast(4)}",
+                                commandType = "FIRE_CONTROL_PERMIT",
+                                targetNodeId = "DRONE_UAV_01",
+                                args = "WAYPOINT_LAT_19.432_LON_-99.133"
+                            )
+                            cachedSignedPayload = signed
+                            val result = verifier.verifyC2Payload(signed)
+                            lastVerificationResult = result
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669))
+                    ) {
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Emitir Orden Firmada", fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            cachedSignedPayload?.let { cached ->
+                                // Reinyectar el mismo sobre con el mismo nonce
+                                val result = verifier.verifyC2Payload(cached)
+                                lastVerificationResult = result
+                            }
+                        },
+                        enabled = cachedSignedPayload != null,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    ) {
+                        Icon(Icons.Default.GppBad, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Simular Replay Attack", fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Banner de Resultado de Verificación
+                lastVerificationResult?.let { result ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (result.isValid) Color(0xFF065F46) else Color(0xFF7F1D1D),
+                        border = BorderStroke(1.dp, if (result.isValid) Color(0xFF10B981) else Color(0xFFEF4444)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                if (result.isValid) "ORDEN AUTÉNTICA Y VÁLIDA" else "¡ATAQUE INTERCEPTADO Y BLOQUEADO!",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                "Motivo: ${result.reason} • Latencia: ${result.ageMs}ms • Replay: ${if (result.isReplayDetected) "SÍ (DESCARTADO)" else "NO"}",
+                                fontSize = 7.5.sp,
+                                color = Color(0xFFE2E8F0)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Historial de Seguridad
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF161B22),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Bitácora de Eventos de Criptoseguridad", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = Color.Gray)
+                if (state.securityLogs.isEmpty()) {
+                    Text("Sin alertas registradas.", fontSize = 8.sp, color = Color.DarkGray)
+                } else {
+                    state.securityLogs.takeLast(6).reversed().forEach { log ->
+                        Text(log, fontSize = 7.5.sp, color = Color(0xFFCBD5E1), fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+    }
+}
+
